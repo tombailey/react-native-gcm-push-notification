@@ -1,22 +1,22 @@
 {
-  "name": "react-native-gcm-android",
-  "version": "0.1.9",
+  "name": "react-native-gcm",
+  "version": "0.0.1",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/oney/react-native-gcm-android.git"
+    "url": "git+https://github.com/evollu/react-native-gcm.git"
   },
   "nativePackage": true,
   "description": "GCM for React Native Android",
   "author": "Oney <appdevoney@gmail.com>",
-  "homepage": "https://github.com/oney/react-native-gcm-android",
+  "homepage": "https://github.com/evollu/react-native-gcm",
   "keywords": [
     "react-component",
     "react-native",
     "android",
+    "ios"
     "GCM"
   ],
   "peerDependencies": {
-    "react-native": ">=0.11.0",
-    "react-native-system-notification": "^0.1.2"
+    "react-native": ">=0.11.0"
   }
 }
