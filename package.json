@@ -13,7 +13,7 @@
     "react-component",
     "react-native",
     "android",
-    "ios"
+    "ios",
     "GCM"
   ],
   "peerDependencies": {
