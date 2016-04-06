@@ -57,7 +57,7 @@ apply plugin: 'com.google.gms.google-services'           // <- Add this line
         android:permission="com.google.android.c2dm.permission.SEND" >
         <intent-filter>
             <action android:name="com.google.android.c2dm.intent.RECEIVE" />
-            <category android:name="com.rn" />
+            <category android:name="com.xxx.yyy" />
         </intent-filter>
     </receiver>
     <service android:name="com.oney.gcm.GcmRegistrationService"/>
