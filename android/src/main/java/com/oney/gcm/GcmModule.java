@@ -15,6 +15,7 @@ import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.modules.core.DeviceEventManagerModule;
+import com.google.android.gms.gcm.GcmPubSub;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -40,6 +41,7 @@ public class GcmModule extends ReactContextBaseJavaModule implements LifecycleEv
     private final static String TAG = GcmModule.class.getCanonicalName();
     private Intent mIntent;
     private boolean mIsInForeground;
+    private String registrationToken;
 
     public GcmModule(ReactApplicationContext reactContext, Intent intent) {
         super(reactContext);
@@ -73,7 +75,7 @@ public class GcmModule extends ReactContextBaseJavaModule implements LifecycleEv
             Bundle bundle = mIntent.getBundleExtra("bundle");
             String bundleString = convertJSON(bundle);
             Log.d(TAG, "bundleString: " + bundleString);
-            constants.put("launchNotification", bundleString);
+            constants.put("initialNotification", bundleString);
         }
         return constants;
     }
@@ -95,15 +97,16 @@ public class GcmModule extends ReactContextBaseJavaModule implements LifecycleEv
                 if (success) {
                     String token = bundle.getString("token");
                     WritableMap params = Arguments.createMap();
-                    params.putString("deviceToken", token);
+                    params.putString("registrationToken", token);
+                    registrationToken = token;
 
-                    sendEvent("remoteNotificationsRegistered", params);
+                    sendEvent("GCMRemoteNotificationRegistered", params);
                 } else {
                     String message = bundle.getString("message");
                     WritableMap params = Arguments.createMap();
-                    params.putString("message", message);
+                    params.putString("error", message);
 
-                    sendEvent("remoteNotificationsRegisteredError", params);
+                    sendEvent("GCMRemoteNotificationRegistered", params);
 
                 }
             }
@@ -144,7 +147,7 @@ public class GcmModule extends ReactContextBaseJavaModule implements LifecycleEv
                     params.putString("dataJSON", bundleString);
                     params.putBoolean("isInForeground", mIsInForeground);
 
-                    sendEvent("remoteNotificationReceived", params);
+                    sendEvent("GCMRemoteNotificationReceived", params);
                     abortBroadcast();
                 } else {
                 }
@@ -235,6 +238,36 @@ public class GcmModule extends ReactContextBaseJavaModule implements LifecycleEv
         notif.defaults |= Notification.DEFAULT_LIGHTS;
 
         notificationManager.notify(0, notif);
+    }
+
+    @ReactMethod
+    public void subscribeTopic(String topic, com.facebook.react.bridge.Callback callback){
+        if(registrationToken != null && mIsInForeground){
+            GcmPubSub pubSub = GcmPubSub.getInstance(getReactApplicationContext());
+            try{
+                pubSub.subscribe(registrationToken, topic, null);
+            } catch (Exception e){
+                callback.invoke(e.getMessage());
+            }
+            callback.invoke(null);
+        } else {
+            callback.invoke("Not connected to GCM");
+        }
+    }
+
+    @ReactMethod
+    public void unsubscribeTopic(String topic, com.facebook.react.bridge.Callback callback){
+        if(registrationToken != null && mIsInForeground){
+            GcmPubSub pubSub = GcmPubSub.getInstance(getReactApplicationContext());
+            try{
+                pubSub.unsubscribe(registrationToken, topic);
+            } catch (Exception e){
+                callback.invoke(e.getMessage());
+            }
+            callback.invoke(null);
+        } else {
+            callback.invoke("Not connected to GCM");
+        }
     }
 
     @Override

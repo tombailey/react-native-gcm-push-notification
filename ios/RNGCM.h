@@ -13,17 +13,12 @@
 
 #import "RCTBridgeModule.h"
 
-@interface RNGCM : NSObject <RCTBridgeModule>
 
-+ (void)didRegisterUserNotificationSettings:(UIUserNotificationSettings *)notificationSettings;
-+ (void)didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)deviceToken delegate:(id<GCMReceiverDelegate>)delegate ;
-+ (void)didReceiveLocalNotification:(UILocalNotification *)notification;
-+ (void)didReceiveRemoteNotification:(NSDictionary *)notification fetchCompletionHandler:(void (^)(UIBackgroundFetchResult))handler;
-+ (void)didFailToRegisterForRemoteNotificationsWithError:(NSError *)error;
+extern NSString *const GCMRemoteNotificationReceived;
+extern NSString *const GCMRemoteNotificationRegistered;
 
-+ (void)connectToGCM;
-+ (void)disconnectGCM;
-+ (void)initGCMWithDelegate:(id<GCMReceiverDelegate>)delegate;
-+ (void)requestPermissions;
+@interface RNGCM : NSObject <RCTBridgeModule, GGLInstanceIDDelegate, GCMReceiverDelegate>
+
+@property (nonatomic, assign) bool connectedToGCM;
 
 @end

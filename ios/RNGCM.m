@@ -24,32 +24,25 @@
 
 #endif
 
-NSString *const RCTLocalNotificationReceived = @"LocalNotificationReceived";
-NSString *const RCTRemoteNotificationReceived = @"RemoteNotificationReceived";
-NSString *const RCTRemoteNotificationsRegistered = @"RemoteNotificationsRegistered";
+NSString *const GCMRemoteNotificationReceived = @"GCMRemoteNotificationReceived";
+NSString *const GCMRemoteNotificationRegistered = @"GCMRemoteNotificationRegistered";
+NSString *const GCMTopicSubscribed = @"GCMTopicSubscribed";
 
-@implementation RCTConvert (UILocalNotification)
-
-+ (UILocalNotification *)UILocalNotification:(id)json
-{
-  NSDictionary<NSString *, id> *details = [self NSDictionary:json];
-  UILocalNotification *notification = [UILocalNotification new];
-  notification.fireDate = [RCTConvert NSDate:details[@"fireDate"]] ?: [NSDate date];
-  notification.alertBody = [RCTConvert NSString:details[@"alertBody"]];
-  notification.alertAction = [RCTConvert NSString:details[@"alertAction"]];
-  notification.soundName = [RCTConvert NSString:details[@"soundName"]] ?: UILocalNotificationDefaultSoundName;
-  notification.userInfo = [RCTConvert NSDictionary:details[@"userInfo"]];
-  notification.category = [RCTConvert NSString:details[@"category"]];
-  return notification;
-}
-
-@end
 
 @implementation RNGCM
+
+NSString* registrationToken;
 
 RCT_EXPORT_MODULE()
 
 @synthesize bridge = _bridge;
+
+- (NSDictionary<NSString *, id> *)constantsToExport
+{
+  NSDictionary<NSString *, id> *initialNotification =
+  [_bridge.launchOptions[UIApplicationLaunchOptionsRemoteNotificationKey] copy];
+  return @{@"initialNotification": RCTNullIfNil(initialNotification)};
+}
 
 - (void)dealloc
 {
@@ -59,144 +52,60 @@ RCT_EXPORT_MODULE()
 - (void)setBridge:(RCTBridge *)bridge
 {
   _bridge = bridge;
-
-  [[NSNotificationCenter defaultCenter] addObserver:self
-                                           selector:@selector(handleLocalNotificationReceived:)
-                                               name:RCTLocalNotificationReceived
-                                             object:nil];
-  [[NSNotificationCenter defaultCenter] addObserver:self
-                                           selector:@selector(handleRemoteNotificationReceived:)
-                                               name:RCTRemoteNotificationReceived
-                                             object:nil];
-  [[NSNotificationCenter defaultCenter] addObserver:self
-                                           selector:@selector(handleRemoteNotificationsRegistered:)
-                                               name:RCTRemoteNotificationsRegistered
-                                             object:nil];
-}
-
-- (NSDictionary<NSString *, id> *)constantsToExport
-{
-  NSDictionary<NSString *, id> *initialNotification =
-    [_bridge.launchOptions[UIApplicationLaunchOptionsRemoteNotificationKey] copy];
-  return @{@"initialNotification": RCTNullIfNil(initialNotification)};
-}
-
-+ (void)initGCMWithDelegate:(id<GCMReceiverDelegate>)delegate {
+  
   NSError* configureError;
   [[GGLContext sharedInstance] configureWithError:&configureError];
   NSAssert(!configureError, @"Error configuring Google services: %@", configureError);
   
   GCMConfig *gcmConfig = [GCMConfig defaultConfig];
-  gcmConfig.receiverDelegate = delegate;
+  gcmConfig.receiverDelegate = self;
   [[GCMService sharedInstance] startWithConfig:gcmConfig];
+  
+  GGLInstanceIDConfig *instanceIDConfig = [GGLInstanceIDConfig defaultConfig];
+  instanceIDConfig.delegate = self;
+  // Start the GGLInstanceID shared instance with the that config and request a registration
+  // token to enable reception of notifications
+  [[GGLInstanceID sharedInstance] startWithConfig:instanceIDConfig];
+  
+
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(handleRemoteNotificationReceived:)
+                                               name:GCMRemoteNotificationReceived
+                                             object:nil];
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(handleRemoteNotificationsRegistered:)
+                                               name:GCMRemoteNotificationRegistered
+                                             object:nil];
+  
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(disconnectGCM)
+                                               name:UIApplicationDidEnterBackgroundNotification
+                                             object:nil];
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(connectToGCM)
+                                               name:UIApplicationDidBecomeActiveNotification
+                                             object:nil];
 }
 
-+ (void)connectToGCM
+- (void)connectToGCM
 {
   [[GCMService sharedInstance] connectWithHandler:^(NSError *error) {
     if (error) {
       NSLog(@"Could not connect to GCM: %@", error.localizedDescription);
     } else {
+      self.connectedToGCM = YES;
       NSLog(@"Connected to GCM");
     }
   }];
 }
 
-+ (void)disconnectGCM
+- (void)disconnectGCM
 {
   [[GCMService sharedInstance] disconnect];
+  self.connectedToGCM = NO;
 }
 
-+ (void)didRegisterUserNotificationSettings:(__unused UIUserNotificationSettings *)notificationSettings
-{
-  if ([UIApplication instancesRespondToSelector:@selector(registerForRemoteNotifications)]) {
-    [[UIApplication sharedApplication] registerForRemoteNotifications];
-  }
-}
-
-+ (void)didFailToRegisterForRemoteNotificationsWithError:(NSError *)error
-{
-  NSLog(@"Registration for remote notification failed with error: %@", error.localizedDescription);
-
-  NSDictionary *userInfo = @{@"error" :error.localizedDescription};
-  [[NSNotificationCenter defaultCenter] postNotificationName:RCTRemoteNotificationsRegistered
-                                                      object:self
-                                                    userInfo:userInfo];
-}
-
-+ (void)didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)deviceToken delegate:(id<GCMReceiverDelegate>)delegate 
-{
-  GGLInstanceIDConfig *instanceIDConfig = [GGLInstanceIDConfig defaultConfig];
-  instanceIDConfig.delegate = delegate;
-  // Start the GGLInstanceID shared instance with the that config and request a registration
-  // token to enable reception of notifications
-  [[GGLInstanceID sharedInstance] startWithConfig:instanceIDConfig];
-  __weak typeof(self) weakSelf = self;
-  void (^registrationHandler) (NSString *registrationToken, NSError *error) = ^(NSString *registrationToken, NSError *error){
-    if (registrationToken != nil) {
-      NSLog(@"Registration Token: %@", registrationToken);
-      
-      NSMutableString *hexString = [NSMutableString string];
-      NSUInteger deviceTokenLength = deviceToken.length;
-      const unsigned char *bytes = deviceToken.bytes;
-      for (NSUInteger i = 0; i < deviceTokenLength; i++) {
-        [hexString appendFormat:@"%02x", bytes[i]];
-      }
-      
-      NSDictionary *userInfo = @{@"registrationToken":registrationToken, @"deviceToken":[hexString copy]};
-      [[NSNotificationCenter defaultCenter] postNotificationName:RCTRemoteNotificationsRegistered
-                                                          object:weakSelf
-                                                        userInfo:userInfo];
-    } else {
-      NSLog(@"Registration to GCM failed with error: %@", error.localizedDescription);
-      NSDictionary *userInfo = @{@"error":error.localizedDescription};
-      [[NSNotificationCenter defaultCenter] postNotificationName:RCTRemoteNotificationsRegistered
-                                                          object:weakSelf
-                                                        userInfo:userInfo];
-    }
-  };
-
-  NSDictionary *registrationOptions = @{kGGLInstanceIDRegisterAPNSOption:deviceToken,
-                           kGGLInstanceIDAPNSServerTypeSandboxOption:@YES};
-  
-  NSString* gcmSenderID = [[[GGLContext sharedInstance] configuration] gcmSenderID];
-  
-  [[GGLInstanceID sharedInstance] tokenWithAuthorizedEntity:gcmSenderID
-                                                      scope:kGGLInstanceIDScopeGCM
-                                                    options:registrationOptions
-                                                    handler:registrationHandler];
-
-}
-
-+ (void)didReceiveRemoteNotification:(NSDictionary *)notification fetchCompletionHandler:(void (^)(UIBackgroundFetchResult))handler
-{
-  NSLog(@"Notification received: %@", notification);
-  
-  [[GCMService sharedInstance] appDidReceiveMessage:notification];
-  
-  [[NSNotificationCenter defaultCenter] postNotificationName:RCTRemoteNotificationReceived
-                                                      object:self
-                                                    userInfo:notification];
-  if(handler != nil){
-    handler(UIBackgroundFetchResultNoData);
-  }
-}
-
-+ (void)didReceiveLocalNotification:(UILocalNotification *)notification
-{
-  NSMutableDictionary *details = [NSMutableDictionary new];
-  if (notification.alertBody) {
-    details[@"alertBody"] = notification.alertBody;
-  }
-  if (notification.userInfo) {
-    details[@"userInfo"] = RCTJSONClean(notification.userInfo);
-  }
-  [[NSNotificationCenter defaultCenter] postNotificationName:RCTLocalNotificationReceived
-                                                      object:self
-                                                    userInfo:details];
-}
-
-+ (void)requestPermissions
+RCT_EXPORT_METHOD(requestPermissions)
 {
   if (RCTRunningInAppExtension()) {
     return;
@@ -222,106 +131,89 @@ RCT_EXPORT_MODULE()
   
 }
 
-- (void)handleLocalNotificationReceived:(NSNotification *)notification
-{
-  [_bridge.eventDispatcher sendDeviceEventWithName:@"localNotificationReceived"
-                                              body:notification.userInfo];
-}
-
 - (void)handleRemoteNotificationReceived:(NSNotification *)notification
 {
-  [_bridge.eventDispatcher sendDeviceEventWithName:@"remoteNotificationReceived"
+  [[GCMService sharedInstance] appDidReceiveMessage:notification.userInfo];
+  [_bridge.eventDispatcher sendDeviceEventWithName:GCMRemoteNotificationReceived
                                               body:notification.userInfo];
 }
 
 - (void)handleRemoteNotificationsRegistered:(NSNotification *)notification
 {
-  [_bridge.eventDispatcher sendDeviceEventWithName:@"remoteNotificationsRegistered"
-                                              body:notification.userInfo];
-}
-
-/**
- * Update the application icon badge number on the home screen
- */
-RCT_EXPORT_METHOD(setApplicationIconBadgeNumber:(NSInteger)number)
-{
-  RCTSharedApplication().applicationIconBadgeNumber = number;
-}
-
-/**
- * Get the current application icon badge number on the home screen
- */
-RCT_EXPORT_METHOD(getApplicationIconBadgeNumber:(RCTResponseSenderBlock)callback)
-{
-  callback(@[@(RCTSharedApplication().applicationIconBadgeNumber)]);
-}
-
-RCT_EXPORT_METHOD(requestPermissions:(NSDictionary *)permissions)
-{
-  [RCTGCMPushNotificationManager requestPermissions];
-}
-
-RCT_EXPORT_METHOD(abandonPermissions)
-{
-  [RCTSharedApplication() unregisterForRemoteNotifications];
-}
-
-RCT_EXPORT_METHOD(checkPermissions:(RCTResponseSenderBlock)callback)
-{
-  if (RCTRunningInAppExtension()) {
-    callback(@[@{@"alert": @NO, @"badge": @NO, @"sound": @NO}]);
-    return;
-  }
-
-  NSUInteger types = 0;
-  if ([UIApplication instancesRespondToSelector:@selector(currentUserNotificationSettings)]) {
-    types = [RCTSharedApplication() currentUserNotificationSettings].types;
+  if([notification.userInfo objectForKey:@"deviceToken"] != nil){
+    NSData* deviceToken = [notification.userInfo objectForKey:@"deviceToken"];
+    __weak typeof(self) weakSelf = self;;
+    
+    NSDictionary *registrationOptions = @{kGGLInstanceIDRegisterAPNSOption:deviceToken,
+                                          kGGLInstanceIDAPNSServerTypeSandboxOption:@YES};
+    
+    NSString* gcmSenderID = [[[GGLContext sharedInstance] configuration] gcmSenderID];
+    
+    [[GGLInstanceID sharedInstance] tokenWithAuthorizedEntity:gcmSenderID scope:kGGLInstanceIDScopeGCM options:registrationOptions
+                                                      handler:^(NSString *token, NSError *error){
+                                                        if (token != nil) {
+                                                          NSLog(@"Registration Token: %@", token);
+                                                          
+                                                          weakSelf.connectedToGCM = YES;
+                                                          registrationToken = token;
+                                                          
+                                                          NSDictionary *userInfo = @{@"registrationToken":token};
+                                                          [_bridge.eventDispatcher sendDeviceEventWithName:GCMRemoteNotificationRegistered
+                                                                                                      body:userInfo];
+                                                        } else {
+                                                          NSLog(@"Registration to GCM failed with error: %@", error.localizedDescription);
+                                                          NSDictionary *userInfo = @{@"error":error.localizedDescription};
+                                                          [_bridge.eventDispatcher sendDeviceEventWithName:GCMRemoteNotificationRegistered
+                                                                                                      body:userInfo];
+                                                        }
+                                                      }];
   } else {
-
-#if __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_8_0
-
-    types = [RCTSharedApplication() enabledRemoteNotificationTypes];
-
-#endif
-
+    [_bridge.eventDispatcher sendDeviceEventWithName:GCMRemoteNotificationRegistered
+                                                body:notification.userInfo];
   }
-
-  callback(@[@{
-    @"alert": @((types & UIUserNotificationTypeAlert) > 0),
-    @"badge": @((types & UIUserNotificationTypeBadge) > 0),
-    @"sound": @((types & UIUserNotificationTypeSound) > 0),
-  }]);
+  
 }
 
-RCT_EXPORT_METHOD(presentLocalNotification:(UILocalNotification *)notification)
-{
-  [RCTSharedApplication() presentLocalNotificationNow:notification];
+-(void)onTokenRefresh {
+  [self requestPermissions];
 }
 
-RCT_EXPORT_METHOD(scheduleLocalNotification:(UILocalNotification *)notification)
-{
-  [RCTSharedApplication() scheduleLocalNotification:notification];
+
+RCT_EXPORT_METHOD(subscribeTopic:(NSString*) topic callback: (RCTResponseSenderBlock)callback) {
+  // If the app has a registration token and is connected to GCM, proceed to subscribe to the
+  // topic
+  if (self.connectedToGCM && registrationToken) {
+    [[GCMPubSub sharedInstance] subscribeWithToken:registrationToken
+                                             topic:topic
+                                           options:nil
+                                           handler:^(NSError *error) {
+                                             if(error == nil || error.code == 3001){
+                                               callback(@[]);
+                                             }else{
+                                               callback(@[error.localizedDescription]);
+                                             }
+                                           }];
+  }else{
+    callback(@[@"GCM not connected"]);
+  }
 }
 
-RCT_EXPORT_METHOD(cancelAllLocalNotifications)
-{
-  [RCTSharedApplication() cancelAllLocalNotifications];
-}
-
-RCT_EXPORT_METHOD(cancelLocalNotifications:(NSDictionary *)userInfo)
-{
-  for (UILocalNotification *notification in [UIApplication sharedApplication].scheduledLocalNotifications) {
-    __block BOOL matchesAll = YES;
-    NSDictionary *notificationInfo = notification.userInfo;
-    [userInfo enumerateKeysAndObjectsUsingBlock:^(NSString *key, id obj, BOOL *stop) {
-      if (![notificationInfo[key] isEqual:obj]) {
-        matchesAll = NO;
-        *stop = YES;
-      }
-    }];
-    if (matchesAll) {
-      [[UIApplication sharedApplication] cancelLocalNotification:notification];
-    }
+RCT_EXPORT_METHOD(unsubscribeTopic:(NSString*) topic callback: (RCTResponseSenderBlock)callback) {
+  // If the app has a registration token and is connected to GCM, proceed to subscribe to the
+  // topic
+  if (self.connectedToGCM && registrationToken) {
+    [[GCMPubSub sharedInstance] unsubscribeWithToken:registrationToken
+                                             topic:topic
+                                           options:nil
+                                           handler:^(NSError *error) {
+                                             if(error == nil || error.code == 3001){
+                                               callback(@[]);
+                                             }else{
+                                               callback(@[error.localizedDescription]);
+                                             }
+                                           }];
+  }else{
+    callback(@[@"GCM not connected"]);
   }
 }
 

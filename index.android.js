@@ -8,11 +8,10 @@ var {
 var GcmModule = NativeModules.GcmModule;
 
 var _notifHandlers = new Map();
-var _initialNotification = GcmModule && GcmModule.launchNotification;
+var _initialNotification = GcmModule && GcmModule.initialNotification;
 
-var DEVICE_NOTIF_EVENT = 'remoteNotificationReceived';
-var NOTIF_REGISTER_EVENT = 'remoteNotificationsRegistered';
-var NOTIF_REGISTER_ERROR_EVENT = 'remoteNotificationsRegisteredError';
+var DEVICE_NOTIF_EVENT = 'GCMRemoteNotificationReceived';
+var NOTIF_REGISTER_EVENT = 'GCMRemoteNotificationRegistered';
 
 class GCMClass {
   static addEventListener(type: string, handler: Function) {
@@ -30,15 +29,7 @@ class GCMClass {
       listener = DeviceEventEmitter.addListener(
         NOTIF_REGISTER_EVENT,
         (registrationInfo) => {
-          handler(registrationInfo.deviceToken);
-        }
-      );
-    } else if (type === 'registerError') {
-      listener = DeviceEventEmitter.addListener(
-        NOTIF_REGISTER_ERROR_EVENT,
-        (info) => {
-          var error = new Error(info.message);
-          handler(error);
+          handler(registrationInfo);
         }
       );
     }
@@ -58,9 +49,6 @@ class GCMClass {
     GcmModule.requestPermissions();
   }
 
-  static abandonPermissions() {
-  }
-
   static stopService() {
     GcmModule.stopService();
   }
@@ -68,32 +56,19 @@ class GCMClass {
     GcmModule.createNotification(infos);
   }
 
-  static checkPermissions(callback: Function) {
-  }
-
-  static presentLocalNotification(details: Object) {
-  }
-
-  static scheduleLocalNotification(details: Object) {
-  }
-
-  static cancelAllLocalNotifications() {
-  }
-
-  static setApplicationIconBadgeNumber(number: number) {
-  }
-
-  static getApplicationIconBadgeNumber(callback: Function) {
-  }
-
-  static cancelLocalNotifications(userInfo: Object) {
-  }
-
   static popInitialNotification() {
     var initialNotification = _initialNotification &&
-      new GCMClass(_initialNotification);
+      new GCMClass(JSON.parse(_initialNotification));
     _initialNotification = null;
     return initialNotification;
+  }
+
+  static subscribeTopic(topic, callback){
+    GcmModule.subscribeTopic(topic, callback)
+  }
+
+  static unsubscribeTopic(topic, callback){
+    GcmModule.unsubscribeTopic(topic, callback)
   }
 
   constructor(data) {
