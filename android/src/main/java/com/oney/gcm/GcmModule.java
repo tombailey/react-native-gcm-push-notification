@@ -249,7 +249,7 @@ public class GcmModule extends ReactContextBaseJavaModule implements LifecycleEv
             } catch (Exception e){
                 callback.invoke(e.getMessage());
             }
-            callback.invoke(null);
+            callback.invoke();
         } else {
             callback.invoke("Not connected to GCM");
         }
