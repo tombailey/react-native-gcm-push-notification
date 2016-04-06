@@ -9,9 +9,8 @@ https://github.com/oney/TestGcm
 ## Installation
 
 - Run `npm install react-native-gcm-android --save`
-
 - Run rnpm link
-- 
+
 ## Android Configuration
 
 - In `android/build.gradle`
