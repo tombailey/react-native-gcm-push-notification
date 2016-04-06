@@ -1,6 +1,6 @@
-# react-native-gcm-android
+# react-native-gcm
 
-GCM for React Native Android
+GCM for React Native Android and IOS
 
 ## Demo
 
@@ -10,20 +10,15 @@ https://github.com/oney/TestGcm
 
 - Run `npm install react-native-gcm-android --save`
 
+- Run rnpm link
+- 
+## Android Configuration
+
 - In `android/build.gradle`
 ```gradle
 dependencies {
     classpath 'com.android.tools.build:gradle:1.3.1'
-    classpath 'com.google.gms:google-services:1.5.0-beta3' // <- Add this line
-```
-
-- In `android/settings.gradle`, add
-```gradle
-include ':RNGcmAndroid', ':app'
-project(':RNGcmAndroid').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-gcm-android/android')
-
-include ':react-native-system-notification'
-project(':react-native-system-notification').projectDir = new File(settingsDir, '../node_modules/react-native-system-notification/android')
+    classpath 'com.google.gms:google-services:2.1.0-alpha3' // <- Add this line
 ```
 
 - In `android/app/build.gradle`
@@ -31,14 +26,6 @@ project(':react-native-system-notification').projectDir = new File(settingsDir, 
 apply plugin: "com.android.application"
 apply plugin: 'com.google.gms.google-services'           // <- Add this line
 ...
-dependencies {
-    compile fileTree(dir: "libs", include: ["*.jar"])
-    compile "com.android.support:appcompat-v7:23.0.1"
-    compile "com.facebook.react:react-native:0.16.+"
-    compile 'com.google.android.gms:play-services-gcm:8.3.0' // <- Add this line
-    compile project(':RNGcmAndroid')                         // <- Add this line
-    compile project(':react-native-system-notification')     // <- Add this line
-}
 ```
 
 - In `android/app/src/main/AndroidManifest.xml`, add these lines, be sure to change `com.xxx.yyy` to your package
@@ -64,58 +51,72 @@ dependencies {
   android:theme="@style/AppTheme">
 
   ...
-  <meta-data
-    android:name="com.google.android.gms.version"
-    android:value="@integer/google_play_services_version" />
-
   <receiver
-    android:name="com.google.android.gms.gcm.GcmReceiver"
-    android:exported="true"
-    android:permission="com.google.android.c2dm.permission.SEND" >
-    <intent-filter>
-      <action android:name="com.google.android.c2dm.intent.RECEIVE" />
-      <category android:name="com.xxx.yyy" />
-    </intent-filter>
-  </receiver>
-  <service android:name="com.oney.gcm.GcmRegistrationService"/>
-  <service android:name="com.oney.gcm.BackgroundService"></service>
-
-  <service
-    android:name="com.oney.gcm.RNGcmListenerService"
-    android:exported="false" >
-    <intent-filter>
-      <action android:name="com.google.android.c2dm.intent.RECEIVE" />
-    </intent-filter>
-  </service>
-  <receiver
-    android:exported="false"
-    android:name="com.oney.gcm.GcmBroadcastReceiver">
-    <intent-filter>
-      <action android:name="com.oney.gcm.GCMReceiveNotification" />
-      </intent-filter>
-  </receiver>
-
-  <receiver android:name="io.neson.react.notification.NotificationEventReceiver" />
-  <receiver android:name="io.neson.react.notification.NotificationPublisher" />
-  <receiver android:name="io.neson.react.notification.SystemBootEventReceiver">
-    <intent-filter>
-      <action android:name="android.intent.action.BOOT_COMPLETED"></action>
-    </intent-filter>
-  </receiver>
+        android:name="com.google.android.gms.gcm.GcmReceiver"
+        android:exported="true"
+        android:permission="com.google.android.c2dm.permission.SEND" >
+        <intent-filter>
+            <action android:name="com.google.android.c2dm.intent.RECEIVE" />
+            <category android:name="com.rn" />
+        </intent-filter>
+    </receiver>
+    <service android:name="com.oney.gcm.GcmRegistrationService"/>
+    <service
+        android:name="com.oney.gcm.RNGcmListenerService"
+        android:exported="false" >
+        <intent-filter>
+            <action android:name="com.google.android.c2dm.intent.RECEIVE" />
+        </intent-filter>
+    </service>
+    <service android:name="com.oney.gcm.RNGcmInstanceIDListenerService" android:exported="false">
+        <intent-filter>
+            <action android:name="com.google.android.gms.iid.InstanceID"/>
+        </intent-filter>
+    </service>
   ...
 ```
-- In `android/app/src/main/java/com/testoe/MainActivity.java`
-```java
-import com.oney.gcm.GcmPackage;                             // <- Add this line
-import io.neson.react.notification.NotificationPackage;     // <- Add this line
-    ...
-        .addPackage(new MainReactPackage())
-        .addPackage(new GcmPackage())                       // <- Add this line
-        .addPackage(new NotificationPackage(this))          // <- Add this line
+
+### IOS Configuration
+in AppDelegate.m add
 ```
+#import "RNGCM.h"
+```
+
+```
+- (void)application:(UIApplication *)application
+didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)deviceToken {
+  NSDictionary *userInfo = @{@"deviceToken" : deviceToken};
+  [[NSNotificationCenter defaultCenter] postNotificationName:GCMRemoteNotificationRegistered
+                                                      object:self
+                                                    userInfo:userInfo];
+}
+
+- (void)application:(UIApplication *)application didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
+   NSDictionary *userInfo = @{@"error" :error.localizedDescription};
+   [[NSNotificationCenter defaultCenter] postNotificationName:GCMRemoteNotificationRegistered
+                                                       object:self
+                                                     userInfo:userInfo];
+}
+
+- (void)application:(UIApplication *)application didReceiveRemoteNotification:(NSDictionary *)notification {
+  [[NSNotificationCenter defaultCenter] postNotificationName: GCMRemoteNotificationReceived
+                                                      object:self
+                                                    userInfo:notification];
+
+}
+
+- (void)application:(UIApplication *)application didReceiveRemoteNotification:(NSDictionary *)notification fetchCompletionHandler:(void (^)(UIBackgroundFetchResult))handler {
+  [[NSNotificationCenter defaultCenter] postNotificationName:GCMRemoteNotificationReceived
+                                                      object:self
+                                                    userInfo:notification];
+  handler(UIBackgroundFetchResultNoData);
+}
+```
+
 
 ### GCM API KEY
 By following [Cloud messaging](https://developers.google.com/cloud-messaging/android/client), you can get `google-services.json` file and place it in `android/app` directory
+By following [Cloud messaging](https://developers.google.com/cloud-messaging/ios/client), you can get `googleServices-info.plist` file and place it in `/ios` directory 
 
 ### Usage
 
@@ -129,8 +130,7 @@ var {
   DeviceEventEmitter,
 } = React;
 
-var GcmAndroid = require('react-native-gcm-android');
-import Notification from 'react-native-system-notification';
+var GCM = require('react-native-gcm');
 
 if (GcmAndroid.launchNotification) {
   var notification = GcmAndroid.launchNotification;
@@ -145,13 +145,12 @@ if (GcmAndroid.launchNotification) {
   var {Router, Route, Schema, Animations, TabBar} = require('react-native-router-flux');
   var YourApp = React.createClass({
     componentDidMount: function() {
-      GcmAndroid.addEventListener('register', function(token){
-        console.log('send gcm token to server', token);
+      GCM.addEventListener('register', function(data){
+        if(!data.error){
+            console.log('send gcm token to server', data.registrationToken);
+        }
       });
-      GcmAndroid.addEventListener('registerError', function(error){
-        console.log('registerError', error.message);
-      });
-      GcmAndroid.addEventListener('notification', function(notification){
+      GCM.addEventListener('notification', function(notification){
         console.log('receive gcm notification', notification);
         var info = JSON.parse(notification.data.info);
         if (!GcmAndroid.isInForeground) {
@@ -162,11 +161,7 @@ if (GcmAndroid.launchNotification) {
         }
       });
 
-      DeviceEventEmitter.addListener('sysNotificationClick', function(e) {
-        console.log('sysNotificationClick', e);
-      });
-
-      GcmAndroid.requestPermissions();
+      GCM.requestPermissions();
     },
     render: function() {
       return (
