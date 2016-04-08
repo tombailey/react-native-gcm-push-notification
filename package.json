@@ -21,7 +21,7 @@
       "sshUrl": "git+ssh://git@github.com/evollu/react-native-gcm.git",
       "type": "github"
     },
-    "name": "react-native-gcm",
+    "name": "react-native-gcm-push-notification",
     "raw": "react-native-gcm@git://github.com/evollu/react-native-gcm.git",
     "rawSpec": "git://github.com/evollu/react-native-gcm.git",
     "scope": null,
