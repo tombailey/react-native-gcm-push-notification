@@ -1,4 +1,4 @@
-# react-native-gcm
+# react-native-gcm-push-notification
 
 GCM for React Native Android and IOS
 
@@ -8,7 +8,7 @@ https://github.com/oney/TestGcm
 
 ## Installation
 
-- Run `npm install react-native-gcm-android --save`
+- Run `npm install react-native-gcm-push-notification --save`
 - Run rnpm link
 
 ## Android Configuration
