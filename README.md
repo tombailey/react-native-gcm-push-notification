@@ -122,17 +122,17 @@ By following [Cloud messaging](https://developers.google.com/cloud-messaging/ios
 ```javascript
 'use strict';
 
-var React = require('react-native');
+var React = require('react'); // RN 0.25+
 var {
   AppRegistry,
   View,
   DeviceEventEmitter,
-} = React;
+} = require('react-native');
 
-var GCM = require('react-native-gcm');
+var GCM = require('react-native-gcm-push-notification');
 
-if (GcmAndroid.launchNotification) {
-  var notification = GcmAndroid.launchNotification;
+var notification = GCM.popInitialNotification();
+if (notification) {
   var info = JSON.parse(notification.info);
   Notification.create({
     subject: info.subject,
