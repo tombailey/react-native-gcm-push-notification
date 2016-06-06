@@ -10,6 +10,7 @@ https://github.com/oney/TestGcm
 
 - Run `npm install react-native-gcm-push-notification --save`
 - Run rnpm link
+- If you need to receive initial notification in Android, change `new GcmPackge()` to `new GcmPackage(getIntent()` in MainActivity.java
 
 ## Android Configuration
 
