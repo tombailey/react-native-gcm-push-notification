@@ -1,3 +1,6 @@
+# Upgrade NOTE
+As google introduced Firebase Cloud Messaging to replace GCM, it is better to start using [fcm API](https://github.com/evollu/react-native-fcm) 
+
 # react-native-gcm-push-notification
 
 GCM for React Native Android and IOS
