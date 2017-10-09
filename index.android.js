@@ -7,42 +7,32 @@ var {
 
 var GcmModule = NativeModules.GcmModule;
 
-var _notifHandlers = new Map();
 var _initialNotification = GcmModule && GcmModule.initialNotification;
 
 var DEVICE_NOTIF_EVENT = 'GCMRemoteNotificationReceived';
 var NOTIF_REGISTER_EVENT = 'GCMRemoteNotificationRegistered';
 
 class GCMClass {
-  static addEventListener(type: string, handler: Function) {
-    var listener;
-    if (type === 'notification') {
-      listener =  DeviceEventEmitter.addListener(
-        DEVICE_NOTIF_EVENT,
-        (notifData) => {
-          GCMClass.isInForeground = notifData.isInForeground;
-          var data = JSON.parse(notifData.dataJSON);
-          handler(new GCMClass(data));
-        }
-      );
-    } else if (type === 'register') {
-      listener = DeviceEventEmitter.addListener(
-        NOTIF_REGISTER_EVENT,
-        (registrationInfo) => {
-          handler(registrationInfo);
-        }
-      );
+  static setRegistrationListener(listener: Function) {
+    if (GCMClass.registrationListener) {
+      GCMClass.registrationListener.remove();
     }
-    _notifHandlers.set(handler, listener);
+
+    GCMClass.registrationListener = DeviceEventEmitter.addListener(NOTIF_REGISTER_EVENT, (registrationInfo) => {
+      listener(registrationInfo);
+    };
   }
 
-  static removeEventListener(type: string, handler: Function) {
-    var listener = _notifHandlers.get(handler);
-    if (!listener) {
-      return;
+  static setNotificationListener(listener: Function) {
+    if (GCMClass.notificationListener) {
+      GCMClass.notificationListener.remove();
     }
-    listener.remove();
-    _notifHandlers.delete(handler);
+
+    GCMClass.notificationListener = DeviceEventEmitter.addListener(DEVICE_NOTIF_EVENT, (notifData) => {
+      GCMClass.isInForeground = notifData.isInForeground;
+      const data = JSON.parse(notifData.dataJSON);
+      listener(new GCMClass(data));
+    });
   }
 
   static requestPermissions() {
