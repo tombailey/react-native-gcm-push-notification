@@ -20,7 +20,7 @@ class GCMClass {
 
     GCMClass.registrationListener = DeviceEventEmitter.addListener(NOTIF_REGISTER_EVENT, (registrationInfo) => {
       listener(registrationInfo);
-    };
+    });
   }
 
   static setNotificationListener(listener: Function) {
